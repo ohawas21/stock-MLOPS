@@ -23,9 +23,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pytest scipy
 
-      - name: Run tests
-        run: pytest tests/ -v
-
       - name: Ingest fresh data
         env:
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
@@ -42,14 +39,17 @@ jobs:
           print(f'Saved {len(features)} rows to data/features.csv')
           "
 
-      - name: Detect data drift
-        run: python pipeline/monitor.py
-        continue-on-error: true
-
-      - name: Retrain models
+      - name: Train models
         env:
           MLFLOW_TRACKING_URI: sqlite:///mlflow.db
         run: python pipeline/train.py
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+      - name: Detect data drift
+        run: python pipeline/monitor.py
+        continue-on-error: true
 
       - name: Pipeline summary
         run: |

@@ -1,0 +1,8 @@
+mlflow
+scikit-learn
+pandas
+fastapi
+uvicorn
+evidently
+python-dotenv
+requests

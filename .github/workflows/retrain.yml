@@ -1,0 +1,58 @@
+name: Stock MLOps Pipeline
+
+"on":
+  schedule:
+    - cron: '0 8 * * 1-5'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  mlops-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest scipy
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+      - name: Ingest fresh data
+        env:
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+        run: python pipeline/ingest.py
+
+      - name: Engineer features
+        run: |
+          python -c "
+          import pandas as pd
+          from pipeline.features import engineer_features
+          df = pd.read_csv('data/stock_prices.csv', parse_dates=['date'])
+          features = engineer_features(df)
+          features.to_csv('data/features.csv', index=False)
+          print(f'Saved {len(features)} rows to data/features.csv')
+          "
+
+      - name: Detect data drift
+        run: python pipeline/monitor.py
+        continue-on-error: true
+
+      - name: Retrain models
+        env:
+          MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+        run: python pipeline/train.py
+
+      - name: Pipeline summary
+        run: |
+          echo "================================"
+          echo "  MLOps Pipeline Complete"
+          echo "================================"
